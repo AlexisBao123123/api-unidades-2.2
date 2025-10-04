@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Administrar Unidades | Localhost</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</head>
+<body>
+<div class="container mt-5">
+    <h2>Gestión de Unidades</h2>
+    <button class="btn btn-primary mb-3" data-bs-toggle="modal" data-bs-target="#modalAgregar">Agregar Unidad</button>
+
+    <table class="table table-striped" id="tablaUnidades">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Nombre</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</div>
+
+<!-- Modal Agregar -->
+<div class="modal fade" id="modalAgregar" tabindex="-1">
+<div class="modal-dialog">
+<div class="modal-content">
+<div class="modal-header">
+<h5 class="modal-title">Agregar Unidad</h5>
+<button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+</div>
+<div class="modal-body">
+<input type="text" id="nombreAgregar" class="form-control" placeholder="Nombre de la unidad">
+</div>
+<div class="modal-footer">
+<button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+<button class="btn btn-primary" onclick="agregarUnidad()">Guardar</button>
+</div>
+</div>
+</div>
+</div>
+
+<!-- Modal Editar -->
+<div class="modal fade" id="modalEditar" tabindex="-1">
+<div class="modal-dialog">
+<div class="modal-content">
+<div class="modal-header">
+<h5 class="modal-title">Editar Unidad</h5>
+<button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+</div>
+<div class="modal-body">
+<input type="hidden" id="idEditar">
+<input type="text" id="nombreEditar" class="form-control">
+</div>
+<div class="modal-footer">
+<button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+<button class="btn btn-warning" onclick="editarUnidad()">Guardar Cambios</button>
+</div>
+</div>
+</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+const API_BASE = 'http://localhost:25253/api/unidades';
+
+// ✅ Cargar unidades
+async function cargarUnidades() {
+    try {
+        const res = await fetch(API_BASE);
+        const data = await res.json();
+        const tbody = document.querySelector('#tablaUnidades tbody');
+        tbody.innerHTML = '';
+        data.datos.forEach(u => {
+            tbody.innerHTML += `
+            <tr>
+                <td>${u.id_uni}</td>
+                <td>${u.nom_uni}</td>
+                <td>
+                    <button class="btn btn-warning btn-sm" onclick="mostrarEditar(${u.id_uni}, '${u.nom_uni}')">Editar</button>
+                    <button class="btn btn-danger btn-sm" onclick="eliminarUnidad(${u.id_uni})">Eliminar</button>
+                </td>
+            </tr>`;
+        });
+    } catch (err) {
+        console.error(err);
+        Swal.fire('Error', 'No se pudieron cargar las unidades', 'error');
+    }
+}
+
+// ✅ Agregar unidad
+async function agregarUnidad() {
+    const nombre = document.getElementById('nombreAgregar').value.trim();
+    if (!nombre) return Swal.fire('Error', 'El nombre es requerido', 'warning');
+
+    try {
+        const res = await fetch(API_BASE, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ nom_uni: nombre })
+        });
+        const data = await res.json();
+        if (data.exito) {
+            Swal.fire('Éxito', data.mensaje, 'success');
+            document.getElementById('nombreAgregar').value = '';
+            bootstrap.Modal.getInstance(document.getElementById('modalAgregar')).hide();
+            cargarUnidades();
+        } else {
+            Swal.fire('Error', data.error, 'error');
+        }
+    } catch (err) {
+        console.error(err);
+    }
+}
+
+// ✅ Mostrar modal editar
+function mostrarEditar(id, nombre) {
+    document.getElementById('idEditar').value = id;
+    document.getElementById('nombreEditar').value = nombre;
+    new bootstrap.Modal(document.getElementById('modalEditar')).show();
+}
+
+// ✅ Editar unidad
+async function editarUnidad() {
+    const id = document.getElementById('idEditar').value;
+    const nombre = document.getElementById('nombreEditar').value.trim();
+    if (!nombre) return Swal.fire('Error', 'El nombre es requerido', 'warning');
+
+    try {
+        const res = await fetch(`${API_BASE}/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ nom_uni: nombre })
+        });
+        const data = await res.json();
+        if (data.exito) {
+            Swal.fire('Éxito', data.mensaje, 'success');
+            bootstrap.Modal.getInstance(document.getElementById('modalEditar')).hide();
+            cargarUnidades();
+        } else {
+            Swal.fire('Error', data.error, 'error');
+        }
+    } catch (err) {
+        console.error(err);
+    }
+}
+
+// ✅ Eliminar unidad
+async function eliminarUnidad(id) {
+    Swal.fire({
+        title: '¿Estás seguro?',
+        text: 'Esta acción no se puede deshacer',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Sí, eliminar',
+        cancelButtonText: 'Cancelar'
+    }).then(async (result) => {
+        if (result.isConfirmed) {
+            try {
+                const res = await fetch(`${API_BASE}/${id}`, { method: 'DELETE' });
+                const data = await res.json();
+                if (data.exito) {
+                    Swal.fire('Eliminado', data.mensaje, 'success');
+                    cargarUnidades();
+                } else {
+                    Swal.fire('Error', data.error, 'error');
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+    });
+}
+
+// ✅ Inicializar
+cargarUnidades();
+</script>
+</body>
+</html>
